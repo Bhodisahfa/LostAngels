@@ -5,11 +5,11 @@ export default async function handler(req, res) {
   const messages = [
     {
       role: "system",
-      content: "You are a narrator for an interactive noir story set in 1919 Los Angeles. Respond with one short scene and two clear, numbered player choices. Do NOT say 'As an AI...'"
+      content: "You are a narrator for a branching noir story set in 1919 Los Angeles. Respond with one immersive paragraph, then TWO player choices as a bullet list (e.g. '- Follow the man', '- Take the alley')."
     },
     {
       role: "user",
-      content: `The player is on the path: ${path}. The last scene was: "${scene}". What happens next? Write one short paragraph, then TWO choices as a bullet list.`
+      content: `The player is on the path: ${path}. The last scene was: "${scene}". What happens next?`
     }
   ];
 
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": \`Bearer \${process.env.OPENAI_API_KEY}\`
+        "Authorization": "Bearer " + process.env.OPENAI_API_KEY
       },
       body: JSON.stringify({
         model: "gpt-4",
@@ -29,25 +29,26 @@ export default async function handler(req, res) {
 
     const json = await response.json();
 
-    if (!json.choices || !json.choices[0]) {
-      console.error("GPT response error:", json);
-      return res.status(500).json({ error: "Unexpected OpenAI response", details: json });
+    if (!json.choices || !json.choices[0]?.message?.content) {
+      console.error("Invalid GPT response:", json);
+      return res.status(500).json({ error: "Unexpected GPT response", raw: json });
     }
 
-    const content = json.choices[0].message.content;
+    const fullText = json.choices[0].message.content;
+    const [sceneText, ...choiceLines] = fullText.split(/\n-\s+/);
 
-    const parts = content.split(/\n\n|\n- /);
-    const sceneText = parts[0];
-    const options = parts.slice(1).filter(line => line.trim()).map(line => line.replace(/^[-*]\s*/, ''));
+    const choices = choiceLines
+      .filter(c => c.trim())
+      .map(c => c.replace(/^[-*]\s*/, "").trim());
 
     res.status(200).json({
       response: {
         scene: sceneText.trim(),
-        choices: options
+        choices: choices.length > 0 ? choices : ["Continue forward", "Turn back"]
       }
     });
   } catch (err) {
-    console.error("GPT call failed:", err);
-    res.status(500).json({ error: "Request to OpenAI failed.", details: err.message });
+    console.error("Error calling OpenAI:", err);
+    res.status(500).json({ error: "Server error", detail: err.message });
   }
 }
