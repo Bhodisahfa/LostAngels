@@ -4,6 +4,7 @@ export default function Drifter() {
       <h1>Drifter — Chapter 1</h1>
       <p>No past, no badge, no plan — only a suitcase and the feeling someone’s watching.</p>
       <p><a href="/stories/arrival">← Back to Arrival</a></p>
+      <p><a href="/stories/next?role=drifter&location=Union%20Station">Continue →</a></p>
     </main>
   );
 }
