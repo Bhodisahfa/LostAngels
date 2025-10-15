@@ -4,6 +4,7 @@ export default function Architect() {
       <h1>Architect — Chapter 1</h1>
       <p>The city waits for your design. But the blueprints on your desk aren’t the ones you drew.</p>
       <p><a href="/stories/arrival">← Back to Arrival</a></p>
+      <p><a href="/stories/next?role=architect&location=City%20Hall">Continue →</a></p>
     </main>
   );
 }
