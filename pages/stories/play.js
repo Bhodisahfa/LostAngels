@@ -66,34 +66,35 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
   };
 
   const handleChoice = (event) => {
-    if (sceneCount >= MAX_FREE_SCENES) return;
+  if (sceneCount >= MAX_FREE_SCENES) return; // <-- this stops new clicks when paywall reached
 
-    if (event.target.tagName === "A") {
-      event.preventDefault();
-      const url = new URL(event.target.href);
-      const newRole = url.searchParams.get("role") || role;
-      const newLocation = url.searchParams.get("location") || location;
+  if (event.target.tagName === "A") {
+    event.preventDefault();
+    const url = new URL(event.target.href);
+    const newRole = url.searchParams.get("role") || role;
+    const newLocation = url.searchParams.get("location") || location;
 
-      let newMemory = { ...memory };
-      const href = event.target.href.toLowerCase();
-      if (href.includes("police") || href.includes("detective")) newMemory.morality += 1;
-      if (href.includes("tunnels") || href.includes("crime")) newMemory.morality -= 1;
-      if (href.includes("drifter") || href.includes("street")) newMemory.notoriety += 1;
-      if (href.includes("architect") || href.includes("union")) newMemory.loyalty += 1;
+    let newMemory = { ...memory };
+    const href = event.target.href.toLowerCase();
+    if (href.includes("police") || href.includes("detective")) newMemory.morality += 1;
+    if (href.includes("tunnels") || href.includes("crime")) newMemory.morality -= 1;
+    if (href.includes("drifter") || href.includes("street")) newMemory.notoriety += 1;
+    if (href.includes("architect") || href.includes("union")) newMemory.loyalty += 1;
 
-      const saveData = {
-        role: newRole,
-        location: newLocation,
-        memory: newMemory,
-      };
-      localStorage.setItem("lostangels_save", JSON.stringify(saveData));
+    const saveData = {
+      role: newRole,
+      location: newLocation,
+      memory: newMemory,
+    };
+    localStorage.setItem("lostangels_save", JSON.stringify(saveData));
 
-      setMemory(newMemory);
-      setRole(newRole);
-      setLocation(newLocation);
-      fetchStory(newRole, newLocation, newMemory);
-    }
-  };
+    setMemory(newMemory);
+    setRole(newRole);
+    setLocation(newLocation);
+    fetchStory(newRole, newLocation, newMemory);
+  }
+};
+
 
   const handleReset = () => {
     localStorage.removeItem("lostangels_save");
