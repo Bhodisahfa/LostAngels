@@ -124,14 +124,37 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
           Restart Story
         </button>
       </div>
-      {loading ? (
-        <p>Loading your next scene...</p>
-      ) : (
-        <div
-          dangerouslySetInnerHTML={{ __html: story }}
-          style={{ lineHeight: 1.6 }}
-        />
-      )}
+      {sceneCount >= MAX_FREE_SCENES ? (
+  <div style={{ textAlign: "center", marginTop: "4rem" }}>
+    <h2>End of your free journey… for now.</h2>
+    <p>
+      You’ve walked the alleys of Lost Angels long enough to know there’s more
+      beneath the surface.
+    </p>
+    <p>Continue your story and unlock deeper paths.</p>
+    <button
+      onClick={() => alert("Stripe payment popup coming soon")}
+      style={{
+        marginTop: "1rem",
+        background: "#f5b642",
+        border: "none",
+        padding: "0.75rem 1.5rem",
+        fontSize: "1rem",
+        cursor: "pointer",
+      }}
+    >
+      Unlock Full Access ($5)
+    </button>
+  </div>
+) : loading ? (
+  <p>Loading your next scene...</p>
+) : (
+  <div
+    dangerouslySetInnerHTML={{ __html: story }}
+    style={{ lineHeight: 1.6 }}
+  />
+)}
+
     </main>
   );
 }
