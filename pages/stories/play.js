@@ -10,6 +10,9 @@ export default function Play() {
     loyalty: 0,
     notoriety: 0,
   });
+  const [sceneCount, setSceneCount] = useState(0);
+const MAX_FREE_SCENES = 10; // adjust this number any time
+
 
   // Randomized noir intros
   const randomIntros = [
