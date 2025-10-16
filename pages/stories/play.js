@@ -3,15 +3,34 @@ import { useEffect, useState } from "react";
 export default function Play() {
   const [story, setStory] = useState("");
   const [loading, setLoading] = useState(false);
-  const [role, setRole] = useState("drifter");
-  const [location, setLocation] = useState("Union Station");
+  const [role, setRole] = useState("");
+  const [location, setLocation] = useState("");
   const [memory, setMemory] = useState({
     morality: 0,
     loyalty: 0,
     notoriety: 0,
   });
 
-  // ✅ Load memory from localStorage
+  // Randomized noir intros
+  const randomIntros = [
+    {
+      role: "drifter",
+      location: "Union Station",
+      line: "Steam rose over the tracks, and you stepped off the train with no name and no plan.",
+    },
+    {
+      role: "architect",
+      location: "City Hall",
+      line: "The city was your masterpiece, and the cracks in its marble were starting to show.",
+    },
+    {
+      role: "detective",
+      location: "Police Academy",
+      line: "They said the badge was tarnished. You called it well-used.",
+    },
+  ];
+
+  // Load saved or assign random intro
   useEffect(() => {
     const saved = localStorage.getItem("lostangels_save");
     if (saved) {
@@ -19,9 +38,15 @@ export default function Play() {
       setRole(data.role);
       setLocation(data.location);
       setMemory(data.memory);
+    } else {
+      const random = randomIntros[Math.floor(Math.random() * randomIntros.length)];
+      setRole(random.role);
+      setLocation(random.location);
+      setStory(`<p><em>${random.line}</em></p>`);
     }
     fetchStory();
   }, []);
+
 
   const fetchStory = async (r = role, loc = location, mem = memory) => {
     setLoading(true);
