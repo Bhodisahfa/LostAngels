@@ -16,7 +16,7 @@ Return pure HTML (paragraphs and <ul><li><a href=...>choice</a></li></ul> only).
 
   const apiKey = process.env.OPENAI_API_KEY;
 
-  // retry helper
+   // retry helper with up to 3 tries
   async function getCompletion(attempt = 1) {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -30,21 +30,21 @@ Return pure HTML (paragraphs and <ul><li><a href=...>choice</a></li></ul> only).
           { role: "system", content: system },
           { role: "user", content: user },
         ],
-        max_tokens: 300,
+        max_tokens: 350,
         temperature: 0.9,
       }),
     });
 
     if (!response.ok) {
-      if (attempt < 2) return getCompletion(attempt + 1); // try again once
+      if (attempt < 3) return getCompletion(attempt + 1);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
     const scene = data?.choices?.[0]?.message?.content?.trim();
 
-    if (!scene || scene.length < 20) {
-      if (attempt < 2) return getCompletion(attempt + 1);
+    if (!scene || scene.length < 40) {
+      if (attempt < 3) return getCompletion(attempt + 1);
       throw new Error("Empty or invalid story content.");
     }
 
@@ -56,7 +56,8 @@ Return pure HTML (paragraphs and <ul><li><a href=...>choice</a></li></ul> only).
     res.status(200).json({ html: scene });
   } catch (err) {
     res.status(200).json({
-      html: `<p><em>The night goes quiet — the AI hesitated for a moment. Try another path.</em></p>`,
+      html: `<p><em>The night goes quiet — the AI hesitated for a moment.</em></p>
+             <p><a href="#" onclick="window.location.reload()">Try again</a></p>`,
     });
   }
 }
