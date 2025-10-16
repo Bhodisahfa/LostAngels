@@ -57,6 +57,8 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
       const res = await fetch(`/api/generate?role=${r}&location=${loc}`);
       const data = await res.json();
       setStory(data.html);
+      setSceneCount(prev => prev + 1);
+
     } catch (err) {
       setStory("Error loading story.");
     }
