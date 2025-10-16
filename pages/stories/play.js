@@ -5,33 +5,17 @@ export default function Play() {
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState("");
   const [location, setLocation] = useState("");
-  const [memory, setMemory] = useState({
-    morality: 0,
-    loyalty: 0,
-    notoriety: 0,
-  });
+  const [memory, setMemory] = useState({ morality: 0, loyalty: 0, notoriety: 0 });
   const [sceneCount, setSceneCount] = useState(0);
   const MAX_FREE_SCENES = 10;
 
-  const randomIntros = [
-    {
-      role: "drifter",
-      location: "Union Station",
-      line: "Steam rose over the tracks, and you stepped off the train with no name and no plan.",
-    },
-    {
-      role: "architect",
-      location: "City Hall",
-      line: "The city was your masterpiece, and the cracks in its marble were starting to show.",
-    },
-    {
-      role: "detective",
-      location: "Police Academy",
-      line: "They said the badge was tarnished. You called it well-used.",
-    },
+  const roles = [
+    { id: "drifter", intro: "Steam rose over the tracks as you stepped off the train with no name and no plan.", location: "Union Station" },
+    { id: "architect", intro: "The city was your masterpiece, and the cracks in its marble were starting to show.", location: "City Hall" },
+    { id: "detective", intro: "They said the badge was tarnished. You called it well-used.", location: "Police Academy" },
   ];
 
-  // Load saved game or assign random intro
+  // Load save or ask for role
   useEffect(() => {
     const saved = localStorage.getItem("lostangels_save");
     if (saved) {
@@ -40,14 +24,20 @@ export default function Play() {
       setLocation(data.location);
       setMemory(data.memory);
       setSceneCount(data.sceneCount || 0);
-    } else {
-      const random = randomIntros[Math.floor(Math.random() * randomIntros.length)];
-      setRole(random.role);
-      setLocation(random.location);
-      setStory(`<p><em>${random.line}</em></p>`);
     }
-    fetchStory();
   }, []);
+
+  const startWithRole = (chosen) => {
+    setRole(chosen.id);
+    setLocation(chosen.location);
+    setStory(`<p><em>${chosen.intro}</em></p>`);
+    localStorage.setItem(
+      "lostangels_save",
+      JSON.stringify({ role: chosen.id, location: chosen.location, memory, sceneCount: 0 })
+    );
+    fetchStory(chosen.id, chosen.location);
+  };
+
 
   const fetchStory = async (r = role, loc = location, mem = memory, count = sceneCount, lastScene = story) => {
   setLoading(true);
@@ -126,7 +116,31 @@ export default function Play() {
         </button>
       </div>
 
-      {sceneCount >= MAX_FREE_SCENES ? (
+
+{!role ? (
+  <div style={{ textAlign: "center", marginTop: "4rem" }}>
+    <h2>Choose your path into Lost Angels</h2>
+    {roles.map((r) => (
+      <button
+        key={r.id}
+        onClick={() => startWithRole(r)}
+        style={{
+          display: "block",
+          margin: "1rem auto",
+          background: "#f5b642",
+          border: "none",
+          padding: "0.75rem 1.5rem",
+          fontSize: "1rem",
+          cursor: "pointer",
+        }}
+      >
+        {r.id.charAt(0).toUpperCase() + r.id.slice(1)}
+      </button>
+    ))}
+  </div>
+) :
+   
+{sceneCount >= MAX_FREE_SCENES ? (
         <div style={{ textAlign: "center", marginTop: "4rem" }}>
           <h2>End of your free journey… for now.</h2>
           <p>
