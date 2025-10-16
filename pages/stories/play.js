@@ -138,9 +138,7 @@ export default function Play() {
       </button>
     ))}
   </div>
-) :
-   
-{sceneCount >= MAX_FREE_SCENES ? (
+) : sceneCount >= MAX_FREE_SCENES ? (
         <div style={{ textAlign: "center", marginTop: "4rem" }}>
           <h2>End of your free journey… for now.</h2>
           <p>
