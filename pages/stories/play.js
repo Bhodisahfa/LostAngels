@@ -11,10 +11,8 @@ export default function Play() {
     notoriety: 0,
   });
   const [sceneCount, setSceneCount] = useState(0);
-const MAX_FREE_SCENES = 10; // adjust this number any time
+  const MAX_FREE_SCENES = 10;
 
-
-  // Randomized noir intros
   const randomIntros = [
     {
       role: "drifter",
@@ -33,7 +31,7 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
     },
   ];
 
-  // Load saved or assign random intro
+  // Load saved game or assign random intro
   useEffect(() => {
     const saved = localStorage.getItem("lostangels_save");
     if (saved) {
@@ -41,6 +39,7 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
       setRole(data.role);
       setLocation(data.location);
       setMemory(data.memory);
+      setSceneCount(data.sceneCount || 0);
     } else {
       const random = randomIntros[Math.floor(Math.random() * randomIntros.length)];
       setRole(random.role);
@@ -50,15 +49,13 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
     fetchStory();
   }, []);
 
-
-  const fetchStory = async (r = role, loc = location, mem = memory) => {
+  const fetchStory = async (r = role, loc = location, mem = memory, count = sceneCount) => {
     setLoading(true);
     try {
       const res = await fetch(`/api/generate?role=${r}&location=${loc}`);
       const data = await res.json();
       setStory(data.html);
-      setSceneCount(prev => prev + 1);
-
+      setSceneCount(count + 1);
     } catch (err) {
       setStory("Error loading story.");
     }
@@ -66,42 +63,44 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
   };
 
   const handleChoice = (event) => {
-  if (sceneCount >= MAX_FREE_SCENES) return; // <-- this stops new clicks when paywall reached
+    if (sceneCount >= MAX_FREE_SCENES) return; // stop further play when paywall triggers
+    if (event.target.tagName === "A") {
+      event.preventDefault();
+      const url = new URL(event.target.href);
+      const newRole = url.searchParams.get("role") || role;
+      const newLocation = url.searchParams.get("location") || location;
 
-  if (event.target.tagName === "A") {
-    event.preventDefault();
-    const url = new URL(event.target.href);
-    const newRole = url.searchParams.get("role") || role;
-    const newLocation = url.searchParams.get("location") || location;
+      let newMemory = { ...memory };
+      const href = event.target.href.toLowerCase();
+      if (href.includes("police") || href.includes("detective")) newMemory.morality += 1;
+      if (href.includes("tunnels") || href.includes("crime")) newMemory.morality -= 1;
+      if (href.includes("drifter") || href.includes("street")) newMemory.notoriety += 1;
+      if (href.includes("architect") || href.includes("union")) newMemory.loyalty += 1;
 
-    let newMemory = { ...memory };
-    const href = event.target.href.toLowerCase();
-    if (href.includes("police") || href.includes("detective")) newMemory.morality += 1;
-    if (href.includes("tunnels") || href.includes("crime")) newMemory.morality -= 1;
-    if (href.includes("drifter") || href.includes("street")) newMemory.notoriety += 1;
-    if (href.includes("architect") || href.includes("union")) newMemory.loyalty += 1;
+      const newSceneCount = sceneCount + 1;
+      const saveData = {
+        role: newRole,
+        location: newLocation,
+        memory: newMemory,
+        sceneCount: newSceneCount,
+      };
+      localStorage.setItem("lostangels_save", JSON.stringify(saveData));
 
-    const saveData = {
-      role: newRole,
-      location: newLocation,
-      memory: newMemory,
-    };
-    localStorage.setItem("lostangels_save", JSON.stringify(saveData));
-
-    setMemory(newMemory);
-    setRole(newRole);
-    setLocation(newLocation);
-    fetchStory(newRole, newLocation, newMemory);
-  }
-};
-
+      setMemory(newMemory);
+      setRole(newRole);
+      setLocation(newLocation);
+      setSceneCount(newSceneCount);
+      fetchStory(newRole, newLocation, newMemory, newSceneCount);
+    }
+  };
 
   const handleReset = () => {
     localStorage.removeItem("lostangels_save");
-    setRole("drifter");
-    setLocation("Union Station");
+    setRole("");
+    setLocation("");
     setMemory({ morality: 0, loyalty: 0, notoriety: 0 });
-    fetchStory("drifter", "Union Station");
+    setSceneCount(0);
+    window.location.reload();
   };
 
   return (
@@ -115,49 +114,43 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
         minHeight: "100vh",
       }}
     >
-      <h1 style={{ fontSize: "1.5rem", color: "#f5b642" }}>
-        Lost Angels: Noir Chronicles
-      </h1>
+      <h1 style={{ fontSize: "1.5rem", color: "#f5b642" }}>Lost Angels: Noir Chronicles</h1>
       <hr style={{ margin: "1rem 0" }} />
       <div style={{ marginBottom: "1rem", fontSize: "0.9rem", opacity: 0.8 }}>
-        <strong>Role:</strong> {role} | <strong>Location:</strong> {location} <br />
-        🧭 Morality: {memory.morality} | 🤝 Loyalty: {memory.loyalty} | 💀 Notoriety: {memory.notoriety}
-        <br />
-        <button onClick={handleReset} style={{ marginTop: "0.5rem" }}>
+        <strong>Role:</strong> {role || "unknown"} | <strong>Location:</strong> {location || "unknown"} <br />
+        🧭 Morality: {memory.morality} | 🤝 Loyalty: {memory.loyalty} | 💀 Notoriety: {memory.notoriety} <br />
+        📖 Scenes Read: {sceneCount}/{MAX_FREE_SCENES}{" "}
+        <button onClick={handleReset} style={{ marginLeft: "0.5rem" }}>
           Restart Story
         </button>
       </div>
-      {sceneCount >= MAX_FREE_SCENES ? (
-  <div style={{ textAlign: "center", marginTop: "4rem" }}>
-    <h2>End of your free journey… for now.</h2>
-    <p>
-      You’ve walked the alleys of Lost Angels long enough to know there’s more
-      beneath the surface.
-    </p>
-    <p>Continue your story and unlock deeper paths.</p>
-    <button
-      onClick={() => alert("Stripe payment popup coming soon")}
-      style={{
-        marginTop: "1rem",
-        background: "#f5b642",
-        border: "none",
-        padding: "0.75rem 1.5rem",
-        fontSize: "1rem",
-        cursor: "pointer",
-      }}
-    >
-      Unlock Full Access ($5)
-    </button>
-  </div>
-) : loading ? (
-  <p>Loading your next scene...</p>
-) : (
-  <div
-    dangerouslySetInnerHTML={{ __html: story }}
-    style={{ lineHeight: 1.6 }}
-  />
-)}
 
+      {sceneCount >= MAX_FREE_SCENES ? (
+        <div style={{ textAlign: "center", marginTop: "4rem" }}>
+          <h2>End of your free journey… for now.</h2>
+          <p>
+            You’ve walked the alleys of Lost Angels long enough to know there’s more beneath the surface.
+          </p>
+          <p>Continue your story and unlock deeper paths.</p>
+          <button
+            onClick={() => alert("Stripe payment popup coming soon")}
+            style={{
+              marginTop: "1rem",
+              background: "#f5b642",
+              border: "none",
+              padding: "0.75rem 1.5rem",
+              fontSize: "1rem",
+              cursor: "pointer",
+            }}
+          >
+            Unlock Full Access ($5)
+          </button>
+        </div>
+      ) : loading ? (
+        <p>Loading your next scene...</p>
+      ) : (
+        <div dangerouslySetInnerHTML={{ __html: story }} style={{ lineHeight: 1.6 }} />
+      )}
     </main>
   );
 }
