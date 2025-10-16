@@ -66,6 +66,8 @@ const MAX_FREE_SCENES = 10; // adjust this number any time
   };
 
   const handleChoice = (event) => {
+    if (sceneCount >= MAX_FREE_SCENES) return;
+
     if (event.target.tagName === "A") {
       event.preventDefault();
       const url = new URL(event.target.href);
