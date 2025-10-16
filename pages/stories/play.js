@@ -119,7 +119,7 @@ export default function Play() {
       <div style={{ marginBottom: "1rem", fontSize: "0.9rem", opacity: 0.8 }}>
         <strong>Role:</strong> {role || "unknown"} | <strong>Location:</strong> {location || "unknown"} <br />
         🧭 Morality: {memory.morality} | 🤝 Loyalty: {memory.loyalty} | 💀 Notoriety: {memory.notoriety} <br />
-        📖 Scenes Read: {sceneCount}/{MAX_FREE_SCENES}{" "}
+        📖 Current Scene: {sceneCount}/{MAX_FREE_SCENES}{" "}
         <button onClick={handleReset} style={{ marginLeft: "0.5rem" }}>
           Restart Story
         </button>
