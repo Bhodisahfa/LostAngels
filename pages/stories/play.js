@@ -49,18 +49,19 @@ export default function Play() {
     fetchStory();
   }, []);
 
-  const fetchStory = async (r = role, loc = location, mem = memory, count = sceneCount) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/generate?role=${r}&location=${loc}`);
-      const data = await res.json();
-      setStory(data.html);
-      setSceneCount(count + 1);
-    } catch (err) {
-      setStory("Error loading story.");
-    }
-    setLoading(false);
-  };
+  const fetchStory = async (r = role, loc = location, mem = memory, count = sceneCount, lastScene = story) => {
+  setLoading(true);
+  try {
+    const res = await fetch(`/api/generate?role=${r}&location=${loc}&lastScene=${encodeURIComponent(lastScene)}`);
+    const data = await res.json();
+    setStory(data.html);
+    setSceneCount(count + 1);
+  } catch (err) {
+    setStory("Error loading story.");
+  }
+  setLoading(false);
+};
+
 
   const handleChoice = (event) => {
     if (sceneCount >= MAX_FREE_SCENES) return; // stop further play when paywall triggers
