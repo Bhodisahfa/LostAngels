@@ -1,54 +1,110 @@
-// --- CLICK HANDLER (robust counters + proper re-render) ---
-const handleChoice = (event) => {
-  const anchor = event.target.closest && event.target.closest("a");
-  if (!anchor) return;
-  event.preventDefault();
+import { useEffect, useState } from "react";
 
-  if (!isDev && sceneCount >= MAX_FREE_SCENES) return;
+export default function Play() {
+  // --- STATE ---
+  const [story, setStory] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState("");
+  const [location, setLocation] = useState("");
+  const [memory, setMemory] = useState({ morality: 0, loyalty: 0, notoriety: 0 });
+  const [sceneCount, setSceneCount] = useState(0);
+  const [isDev, setIsDev] = useState(false);
+  const MAX_FREE_SCENES = 10;
 
-  const url = new URL(anchor.href);
-  const newRole = url.searchParams.get("role") || role;
-  const newLocation = url.searchParams.get("location") || location;
-  const hrefLower = anchor.href.toLowerCase();
+  const roles = [
+    { id: "drifter", intro: "Steam rose over the tracks as you stepped off the train with no name and no plan.", location: "Union Station" },
+    { id: "architect", intro: "The city was your masterpiece, and the cracks in its marble were starting to show.", location: "City Hall" },
+    { id: "detective", intro: "They said the badge was tarnished. You called it well-used.", location: "Police Academy" },
+  ];
 
-  // calculate new memory values
-  const updatedMemory = { ...memory };
+  // --- INITIAL LOAD ---
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("dev") === "1") {
+        setIsDev(true);
+        localStorage.setItem("lostangels_dev", "1");
+      }
+    } catch {}
+    if (localStorage.getItem("lostangels_dev") === "1") setIsDev(true);
 
-  if (hrefLower.includes("police") || hrefLower.includes("detective"))
-    updatedMemory.morality = (updatedMemory.morality || 0) + 1;
-  if (hrefLower.includes("tunnels") || hrefLower.includes("crime"))
-    updatedMemory.morality = (updatedMemory.morality || 0) - 1;
-  if (hrefLower.includes("drifter") || hrefLower.includes("street"))
-    updatedMemory.notoriety = (updatedMemory.notoriety || 0) + 1;
-  if (hrefLower.includes("architect") || hrefLower.includes("union"))
-    updatedMemory.loyalty = (updatedMemory.loyalty || 0) + 1;
+    const saved = localStorage.getItem("lostangels_save");
+    if (saved) {
+      const data = JSON.parse(saved);
+      setRole(data.role);
+      setLocation(data.location);
+      setMemory(data.memory);
+      setSceneCount(data.sceneCount || 0);
+    }
+  }, []);
 
-  // increment scene count
-  const newSceneCount = sceneCount + 1;
-
-  // save game state
-  const saveData = {
-    role: newRole,
-    location: newLocation,
-    memory: updatedMemory,
-    sceneCount: newSceneCount,
+  // --- FETCH STORY ---
+  const fetchStory = async (r = role, loc = location, mem = memory, count = sceneCount, lastScene = story) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/generate?role=${r}&location=${loc}&lastScene=${encodeURIComponent(lastScene)}`);
+      const data = await res.json();
+      setStory(
+        data.html ||
+          "<p><em>The night goes quiet — the AI hesitated for a moment. Try again.</em></p>"
+      );
+      setSceneCount(count + 1);
+    } catch {
+      setStory("<p><em>The night goes quiet — connection lost. Try again.</em></p>");
+    }
+    setLoading(false);
   };
-  try {
-    localStorage.setItem("lostangels_save", JSON.stringify(saveData));
-  } catch (e) {}
 
-  // update React state separately (forces proper re-render)
-  setMemory(updatedMemory);
-  setRole(newRole);
-  setLocation(newLocation);
-  setSceneCount(newSceneCount);
+  // --- START ROLE ---
+  const startWithRole = (chosen) => {
+    setRole(chosen.id);
+    setLocation(chosen.location);
+    const introHTML = `<p><em>${chosen.intro}</em></p>`;
+    setStory(introHTML);
+    localStorage.setItem(
+      "lostangels_save",
+      JSON.stringify({ role: chosen.id, location: chosen.location, memory, sceneCount: 0 })
+    );
+    fetchStory(chosen.id, chosen.location, memory, 0, introHTML);
+  };
 
-  // fetch next story *after* state updates
-  setTimeout(() => {
-    fetchStory(newRole, newLocation, updatedMemory, newSceneCount);
-  }, 50);
-};
-  // === RESET ===
+  // --- HANDLE CHOICE (Counters + Fetch) ---
+  const handleChoice = (event) => {
+    const anchor = event.target.closest("a");
+    if (!anchor) return;
+    event.preventDefault();
+    if (!isDev && sceneCount >= MAX_FREE_SCENES) return;
+
+    const url = new URL(anchor.href);
+    const newRole = url.searchParams.get("role") || role;
+    const newLocation = url.searchParams.get("location") || location;
+    const hrefLower = anchor.textContent.toLowerCase();
+
+    setMemory((prev) => {
+      const next = { ...prev };
+      if (hrefLower.includes("detective") || hrefLower.includes("police")) next.morality += 1;
+      if (hrefLower.includes("crime") || hrefLower.includes("tunnel")) next.morality -= 1;
+      if (hrefLower.includes("street") || hrefLower.includes("drifter")) next.notoriety += 1;
+      if (hrefLower.includes("architect") || hrefLower.includes("union")) next.loyalty += 1;
+      return next;
+    });
+
+    const newSceneCount = sceneCount + 1;
+    const saveData = { role: newRole, location: newLocation, memory, sceneCount: newSceneCount };
+    try {
+      localStorage.setItem("lostangels_save", JSON.stringify(saveData));
+    } catch {}
+
+    setRole(newRole);
+    setLocation(newLocation);
+    setSceneCount(newSceneCount);
+
+    setTimeout(() => {
+      fetchStory(newRole, newLocation, memory, newSceneCount);
+    }, 100);
+  };
+
+  // --- RESET ---
   const handleReset = () => {
     localStorage.removeItem("lostangels_save");
     setRole("");
@@ -58,7 +114,7 @@ const handleChoice = (event) => {
     window.location.reload();
   };
 
-  // === RENDER ===
+  // --- RENDER ---
   return (
     <main
       onClick={handleChoice}
@@ -70,7 +126,7 @@ const handleChoice = (event) => {
         minHeight: "100vh",
       }}
     >
-      <h1 style={{ fontSize: "1.5rem", color: "#f5b642" }}>Lost Angels: Noir Chronicles</h1>
+      <h1 style={{ fontSize: "1.5rem", color: "#f5b642" }}>Lost Angels — Noir Chronicles</h1>
       <hr style={{ margin: "1rem 0" }} />
 
       <div style={{ marginBottom: "1rem", fontSize: "0.9rem", opacity: 0.9 }}>
@@ -78,11 +134,23 @@ const handleChoice = (event) => {
         🧭 Morality: {memory.morality} | 🤝 Loyalty: {memory.loyalty} | 💀 Notoriety: {memory.notoriety}
         <br />
         📖 Scenes Read: {sceneCount}/{MAX_FREE_SCENES}
-        <button onClick={handleReset} style={{ marginLeft: "0.5rem", background: "#333", color: "#fff" }}>
+        <button
+          onClick={handleReset}
+          style={{ marginLeft: "0.5rem", background: "#333", color: "#fff" }}
+        >
           Restart Story
         </button>
         {isDev && (
-          <span style={{ marginLeft: "0.75rem", padding: "2px 8px", background: "#f5b642", color: "#000", borderRadius: "4px", fontSize: "0.8rem" }}>
+          <span
+            style={{
+              marginLeft: "0.75rem",
+              padding: "2px 8px",
+              background: "#f5b642",
+              color: "#000",
+              borderRadius: "4px",
+              fontSize: "0.8rem",
+            }}
+          >
             DEV MODE
           </span>
         )}
@@ -91,20 +159,10 @@ const handleChoice = (event) => {
       {!role ? (
         <div style={{ textAlign: "center", marginTop: "4rem" }}>
           <h2>Choose your path into Lost Angels</h2>
-          {[
-            { id: "drifter", label: "Drifter" },
-            { id: "architect", label: "Architect" },
-            { id: "detective", label: "Detective" },
-          ].map((r) => (
+          {roles.map((r) => (
             <button
               key={r.id}
-              onClick={() =>
-                startWithRole({
-                  id: r.id,
-                  intro: "Loading intro...",
-                  location: r.id === "architect" ? "City Hall" : r.id === "detective" ? "Police Academy" : "Union Station",
-                })
-              }
+              onClick={() => startWithRole(r)}
               style={{
                 display: "block",
                 margin: "1rem auto",
@@ -115,14 +173,16 @@ const handleChoice = (event) => {
                 cursor: "pointer",
               }}
             >
-              {r.label}
+              {r.id.charAt(0).toUpperCase() + r.id.slice(1)}
             </button>
           ))}
         </div>
       ) : !isDev && sceneCount >= MAX_FREE_SCENES ? (
         <div style={{ textAlign: "center", marginTop: "4rem" }}>
           <h2>End of your free journey… for now.</h2>
-          <p>You’ve walked the alleys of Lost Angels long enough to know there’s more beneath the surface.</p>
+          <p>
+            You’ve walked the alleys of Lost Angels long enough to know there’s more beneath the surface.
+          </p>
           <p>Continue your story and unlock deeper paths.</p>
           <button
             onClick={() => alert("Stripe payment popup coming soon")}
@@ -146,4 +206,3 @@ const handleChoice = (event) => {
     </main>
   );
 }
-
