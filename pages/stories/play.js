@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 
 export default function Play() {
-  // --- STATE ---
+  // ---------- STATE ----------
   const [story, setStory] = useState("");
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState("");
   const [location, setLocation] = useState("");
   const [memory, setMemory] = useState({ morality: 0, loyalty: 0, notoriety: 0 });
+  const [memoryTick, setMemoryTick] = useState(0); // forces re-render when counters change
   const [sceneCount, setSceneCount] = useState(0);
   const [isDev, setIsDev] = useState(false);
   const MAX_FREE_SCENES = 10;
@@ -17,7 +18,7 @@ export default function Play() {
     { id: "detective", intro: "They said the badge was tarnished. You called it well-used.", location: "Police Academy" },
   ];
 
-  // --- INITIAL LOAD ---
+  // ---------- INITIAL LOAD ----------
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -38,7 +39,7 @@ export default function Play() {
     }
   }, []);
 
-  // --- FETCH STORY ---
+  // ---------- FETCH STORY ----------
   const fetchStory = async (r = role, loc = location, mem = memory, count = sceneCount, lastScene = story) => {
     setLoading(true);
     try {
@@ -55,7 +56,7 @@ export default function Play() {
     setLoading(false);
   };
 
-  // --- START ROLE ---
+  // ---------- START ROLE ----------
   const startWithRole = (chosen) => {
     setRole(chosen.id);
     setLocation(chosen.location);
@@ -68,7 +69,7 @@ export default function Play() {
     fetchStory(chosen.id, chosen.location, memory, 0, introHTML);
   };
 
-  // --- HANDLE CHOICE (Counters + Fetch) ---
+  // ---------- HANDLE CHOICE (Counters + Fetch) ----------
   const handleChoice = (event) => {
     const anchor = event.target.closest("a");
     if (!anchor) return;
@@ -80,31 +81,28 @@ export default function Play() {
     const newLocation = url.searchParams.get("location") || location;
     const hrefLower = anchor.textContent.toLowerCase();
 
-    setMemory((prev) => {
-      const next = { ...prev };
-      if (hrefLower.includes("detective") || hrefLower.includes("police")) next.morality += 1;
-      if (hrefLower.includes("crime") || hrefLower.includes("tunnel")) next.morality -= 1;
-      if (hrefLower.includes("street") || hrefLower.includes("drifter")) next.notoriety += 1;
-      if (hrefLower.includes("architect") || hrefLower.includes("union")) next.loyalty += 1;
-      return next;
-    });
+    const updatedMemory = { ...memory };
+    if (hrefLower.includes("detective") || hrefLower.includes("police")) updatedMemory.morality += 1;
+    if (hrefLower.includes("crime") || hrefLower.includes("tunnel")) updatedMemory.morality -= 1;
+    if (hrefLower.includes("street") || hrefLower.includes("drifter")) updatedMemory.notoriety += 1;
+    if (hrefLower.includes("architect") || hrefLower.includes("union")) updatedMemory.loyalty += 1;
 
     const newSceneCount = sceneCount + 1;
-    const saveData = { role: newRole, location: newLocation, memory, sceneCount: newSceneCount };
-    try {
-      localStorage.setItem("lostangels_save", JSON.stringify(saveData));
-    } catch {}
+    const saveData = { role: newRole, location: newLocation, memory: updatedMemory, sceneCount: newSceneCount };
+    try { localStorage.setItem("lostangels_save", JSON.stringify(saveData)); } catch {}
 
+    setMemory(updatedMemory);
+    setMemoryTick((t) => t + 1); // force visible refresh
     setRole(newRole);
     setLocation(newLocation);
     setSceneCount(newSceneCount);
 
     setTimeout(() => {
-      fetchStory(newRole, newLocation, memory, newSceneCount);
+      fetchStory(newRole, newLocation, updatedMemory, newSceneCount);
     }, 100);
   };
 
-  // --- RESET ---
+  // ---------- RESET ----------
   const handleReset = () => {
     localStorage.removeItem("lostangels_save");
     setRole("");
@@ -114,7 +112,7 @@ export default function Play() {
     window.location.reload();
   };
 
-  // --- RENDER ---
+  // ---------- RENDER ----------
   return (
     <main
       onClick={handleChoice}
@@ -131,7 +129,7 @@ export default function Play() {
 
       <div style={{ marginBottom: "1rem", fontSize: "0.9rem", opacity: 0.9 }}>
         <strong>Role:</strong> {role || "—"} | <strong>Location:</strong> {location || "—"} <br />
-        🧭 Morality: {memory.morality} | 🤝 Loyalty: {memory.loyalty} | 💀 Notoriety: {memory.notoriety}
+        🧭 Morality: {memory.morality + memoryTick * 0} | 🤝 Loyalty: {memory.loyalty} | 💀 Notoriety: {memory.notoriety}
         <br />
         📖 Scenes Read: {sceneCount}/{MAX_FREE_SCENES}
         <button
