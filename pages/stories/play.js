@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 export default function Play() {
+  // --- STATE SETUP ---
   const [story, setStory] = useState("");
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState("");
@@ -9,14 +10,40 @@ export default function Play() {
   const [sceneCount, setSceneCount] = useState(0);
   const MAX_FREE_SCENES = 10;
 
+  // --- DEV BYPASS ---
+  const [isDev, setIsDev] = useState(false);
+
+  // --- ROLES ---
   const roles = [
-    { id: "drifter", intro: "Steam rose over the tracks as you stepped off the train with no name and no plan.", location: "Union Station" },
-    { id: "architect", intro: "The city was your masterpiece, and the cracks in its marble were starting to show.", location: "City Hall" },
-    { id: "detective", intro: "They said the badge was tarnished. You called it well-used.", location: "Police Academy" },
+    {
+      id: "drifter",
+      intro: "Steam rose over the tracks as you stepped off the train with no name and no plan.",
+      location: "Union Station",
+    },
+    {
+      id: "architect",
+      intro: "The city was your masterpiece, and the cracks in its marble were starting to show.",
+      location: "City Hall",
+    },
+    {
+      id: "detective",
+      intro: "They said the badge was tarnished. You called it well-used.",
+      location: "Police Academy",
+    },
   ];
 
-  // Load save or ask for role
+  // --- LOAD SAVE / DEV MODE ---
   useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("dev") === "1") {
+        setIsDev(true);
+        localStorage.setItem("lostangels_dev", "1");
+      }
+    } catch (e) {}
+
+    if (localStorage.getItem("lostangels_dev") === "1") setIsDev(true);
+
     const saved = localStorage.getItem("lostangels_save");
     if (saved) {
       const data = JSON.parse(saved);
@@ -27,64 +54,89 @@ export default function Play() {
     }
   }, []);
 
+  // --- FETCH STORY ---
+  const fetchStory = async (
+    r = role,
+    loc = location,
+    mem = memory,
+    count = sceneCount,
+    lastScene = story
+  ) => {
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/generate?role=${r}&location=${loc}&lastScene=${encodeURIComponent(lastScene)}`
+      );
+      const data = await res.json();
+      setStory(data.html);
+      setSceneCount(count + 1);
+    } catch (err) {
+      setStory("Error loading story.");
+    }
+    setLoading(false);
+  };
+
+  // --- START NEW GAME WITH ROLE ---
   const startWithRole = (chosen) => {
     setRole(chosen.id);
     setLocation(chosen.location);
     setStory(`<p><em>${chosen.intro}</em></p>`);
     localStorage.setItem(
       "lostangels_save",
-      JSON.stringify({ role: chosen.id, location: chosen.location, memory, sceneCount: 0 })
+      JSON.stringify({
+        role: chosen.id,
+        location: chosen.location,
+        memory,
+        sceneCount: 0,
+      })
     );
     fetchStory(chosen.id, chosen.location);
   };
 
-
-  const fetchStory = async (r = role, loc = location, mem = memory, count = sceneCount, lastScene = story) => {
-  setLoading(true);
-  try {
-    const res = await fetch(`/api/generate?role=${r}&location=${loc}&lastScene=${encodeURIComponent(lastScene)}`);
-    const data = await res.json();
-    setStory(data.html);
-    setSceneCount(count + 1);
-  } catch (err) {
-    setStory("Error loading story.");
-  }
-  setLoading(false);
-};
-
-
+  // --- CLICK HANDLER (robust counters + save) ---
   const handleChoice = (event) => {
-    if (sceneCount >= MAX_FREE_SCENES) return; // stop further play when paywall triggers
-    if (event.target.tagName === "A") {
-      event.preventDefault();
-      const url = new URL(event.target.href);
-      const newRole = url.searchParams.get("role") || role;
-      const newLocation = url.searchParams.get("location") || location;
+    const anchor = event.target.closest && event.target.closest("a");
+    if (!anchor) return;
+    event.preventDefault();
 
-      let newMemory = { ...memory };
-      const href = event.target.href.toLowerCase();
-      if (href.includes("police") || href.includes("detective")) newMemory.morality += 1;
-      if (href.includes("tunnels") || href.includes("crime")) newMemory.morality -= 1;
-      if (href.includes("drifter") || href.includes("street")) newMemory.notoriety += 1;
-      if (href.includes("architect") || href.includes("union")) newMemory.loyalty += 1;
+    if (!isDev && sceneCount >= MAX_FREE_SCENES) return;
+
+    const url = new URL(anchor.href);
+    const newRole = url.searchParams.get("role") || role;
+    const newLocation = url.searchParams.get("location") || location;
+    const hrefLower = anchor.href.toLowerCase();
+
+    setMemory((prev) => {
+      const next = { ...prev };
+      if (hrefLower.includes("police") || hrefLower.includes("detective"))
+        next.morality = (next.morality || 0) + 1;
+      if (hrefLower.includes("tunnels") || hrefLower.includes("crime"))
+        next.morality = (next.morality || 0) - 1;
+      if (hrefLower.includes("drifter") || hrefLower.includes("street"))
+        next.notoriety = (next.notoriety || 0) + 1;
+      if (hrefLower.includes("architect") || hrefLower.includes("union"))
+        next.loyalty = (next.loyalty || 0) + 1;
 
       const newSceneCount = sceneCount + 1;
       const saveData = {
         role: newRole,
         location: newLocation,
-        memory: newMemory,
+        memory: next,
         sceneCount: newSceneCount,
       };
-      localStorage.setItem("lostangels_save", JSON.stringify(saveData));
+      try {
+        localStorage.setItem("lostangels_save", JSON.stringify(saveData));
+      } catch (e) {}
 
-      setMemory(newMemory);
       setRole(newRole);
       setLocation(newLocation);
       setSceneCount(newSceneCount);
-      fetchStory(newRole, newLocation, newMemory, newSceneCount);
-    }
+      fetchStory(newRole, newLocation, next, newSceneCount);
+      return next;
+    });
   };
 
+  // --- RESTART ---
   const handleReset = () => {
     localStorage.removeItem("lostangels_save");
     setRole("");
@@ -94,6 +146,7 @@ export default function Play() {
     window.location.reload();
   };
 
+  // --- RENDER ---
   return (
     <main
       onClick={handleChoice}
@@ -105,44 +158,67 @@ export default function Play() {
         minHeight: "100vh",
       }}
     >
-      <h1 style={{ fontSize: "1.5rem", color: "#f5b642" }}>Lost Angels: Noir Chronicles</h1>
+      <h1 style={{ fontSize: "1.5rem", color: "#f5b642" }}>
+        Lost Angels: Noir Chronicles
+      </h1>
       <hr style={{ margin: "1rem 0" }} />
-      <div style={{ marginBottom: "1rem", fontSize: "0.9rem", opacity: 0.8 }}>
-        <strong>Role:</strong> {role || "unknown"} | <strong>Location:</strong> {location || "unknown"} <br />
-        🧭 Morality: {memory.morality} | 🤝 Loyalty: {memory.loyalty} | 💀 Notoriety: {memory.notoriety} <br />
-        📖 Current Scene: {sceneCount}/{MAX_FREE_SCENES}{" "}
-        <button onClick={handleReset} style={{ marginLeft: "0.5rem" }}>
+
+      <div style={{ marginBottom: "1rem", fontSize: "0.9rem", opacity: 0.85 }}>
+        <strong>Role:</strong> {role || "—"} | <strong>Location:</strong>{" "}
+        {location || "—"} <br />
+        🧭 Morality: {memory.morality} | 🤝 Loyalty: {memory.loyalty} | 💀
+        Notoriety: {memory.notoriety}
+        <br />
+        📖 Scenes Read: {sceneCount}/{MAX_FREE_SCENES}
+        <button
+          onClick={handleReset}
+          style={{ marginLeft: "0.5rem", background: "#333", color: "#fff" }}
+        >
           Restart Story
         </button>
+        {isDev && (
+          <span
+            style={{
+              marginLeft: "0.75rem",
+              padding: "2px 8px",
+              background: "#f5b642",
+              color: "#000",
+              borderRadius: "4px",
+              fontSize: "0.8rem",
+            }}
+          >
+            DEV MODE
+          </span>
+        )}
       </div>
 
-
-{!role ? (
-  <div style={{ textAlign: "center", marginTop: "4rem" }}>
-    <h2>Choose your path into Lost Angels</h2>
-    {roles.map((r) => (
-      <button
-        key={r.id}
-        onClick={() => startWithRole(r)}
-        style={{
-          display: "block",
-          margin: "1rem auto",
-          background: "#f5b642",
-          border: "none",
-          padding: "0.75rem 1.5rem",
-          fontSize: "1rem",
-          cursor: "pointer",
-        }}
-      >
-        {r.id.charAt(0).toUpperCase() + r.id.slice(1)}
-      </button>
-    ))}
-  </div>
-) : sceneCount >= MAX_FREE_SCENES ? (
+      {!role ? (
+        <div style={{ textAlign: "center", marginTop: "4rem" }}>
+          <h2>Choose your path into Lost Angels</h2>
+          {roles.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => startWithRole(r)}
+              style={{
+                display: "block",
+                margin: "1rem auto",
+                background: "#f5b642",
+                border: "none",
+                padding: "0.75rem 1.5rem",
+                fontSize: "1rem",
+                cursor: "pointer",
+              }}
+            >
+              {r.id.charAt(0).toUpperCase() + r.id.slice(1)}
+            </button>
+          ))}
+        </div>
+      ) : !isDev && sceneCount >= MAX_FREE_SCENES ? (
         <div style={{ textAlign: "center", marginTop: "4rem" }}>
           <h2>End of your free journey… for now.</h2>
           <p>
-            You’ve walked the alleys of Lost Angels long enough to know there’s more beneath the surface.
+            You’ve walked the alleys of Lost Angels long enough to know there’s
+            more beneath the surface.
           </p>
           <p>Continue your story and unlock deeper paths.</p>
           <button
@@ -162,7 +238,10 @@ export default function Play() {
       ) : loading ? (
         <p>Loading your next scene...</p>
       ) : (
-        <div dangerouslySetInnerHTML={{ __html: story }} style={{ lineHeight: 1.6 }} />
+        <div
+          dangerouslySetInnerHTML={{ __html: story }}
+          style={{ lineHeight: 1.6 }}
+        />
       )}
     </main>
   );
